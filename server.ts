@@ -1,9 +1,11 @@
-import mongoose from "mongoose";
 import express from "express";
 import cors from "cors";
 import folderRoutes from "./router/folderRoutes";
-// import bookmarkRoutes from "./router/bookmarkRoutes";
 import searchRoutes from "./router/searchRoutes";
+import { connectDB } from "./db";
+import dotenv from "dotenv";
+
+dotenv.config(); // Load environment variables
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,21 +13,15 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-const mongoUri =
-  process.env.MONGODB_URI || "mongodb://localhost:27017/x-bookmark";
-
-mongoose
-  .connect(mongoUri)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.error("⚠️ MongoDB Connection Failed:", err));
+connectDB();
 
 app.use("/folders", folderRoutes);
 app.use("/search", searchRoutes);
 
-// app.use("/bookmarks", bookmarkRoutes);
 app.get("/", (req, res) => {
-  res.write("hello");
+  res.send("Hello, X-Bookmark Server!");
 });
+
 app.listen(port, () => {
   console.log(`🚀 Server is running on port ${port}`);
 });
