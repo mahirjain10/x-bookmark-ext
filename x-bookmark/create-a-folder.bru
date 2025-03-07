@@ -5,7 +5,16 @@ meta {
 }
 
 post {
-  url: http://localhost:3000/api/folders
-  body: none
+  url: http://localhost:3000/folders/folders
+  body: json
   auth: none
+}
+
+body:json {
+  {
+    "userId": "user1234",
+    "name": "My Documents's child v3 ",
+    "isParentRoot": true
+  }
+  
 }

@@ -5,7 +5,13 @@ meta {
 }
 
 post {
-  url: http://localhost:3000/folders/:id/copy
-  body: none
+  url: http://localhost:3000/folders/67cb1f78a262319ffd16923b/copy
+  body: json
   auth: none
+}
+
+body:json {
+  {
+    "newName":""
+  }
 }

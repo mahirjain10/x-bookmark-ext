@@ -21,8 +21,7 @@ connectDB().then(() => {
   app.get("/", (req, res) => {
     res.send("Hello, X-Bookmark Server!");
   });
-  app.listen(`0.0.0.0:${port}`, () => {
-    // Listen on all network interfaces
+  app.listen(port, () => {
     console.log(`🚀 Server is running on port ${port}`);
   });
 });

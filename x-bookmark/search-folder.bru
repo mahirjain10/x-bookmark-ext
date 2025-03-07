@@ -4,13 +4,13 @@ meta {
   seq: 6
 }
 
-post {
-  url: http://localhost:3000/folder/search?query=folder&userId=user1234
+get {
+  url: http://localhost:3000/search/search?query=My&userId=user1234
   body: none
   auth: none
 }
 
 query {
-  query: folder
+  query: My
   userId: user1234
 }
