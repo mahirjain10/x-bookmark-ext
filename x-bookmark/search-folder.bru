@@ -1,0 +1,16 @@
+meta {
+  name: search-folder
+  type: http
+  seq: 6
+}
+
+post {
+  url: http://localhost:3000/folder/search?query=folder&userId=user1234
+  body: none
+  auth: none
+}
+
+query {
+  query: folder
+  userId: user1234
+}

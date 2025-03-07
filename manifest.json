@@ -1,0 +1,25 @@
+{
+  "name": "X-Bookmark-Ext",
+  "version": "1.0.0",
+  "description": "A browser extension to organize bookmarks into folders without a premium subscription.",
+  "manifest_version": 3,
+  "author": "Mahir Jain",
+  "permissions": ["bookmarks", "storage"],
+
+  "host_permissions": ["http://localhost:5000/*"],
+
+  "action": {
+    "default_popup": "public/index.html",
+    "default_title": "Manage Your Bookmarks"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["public/tailwind.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

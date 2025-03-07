@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "x-bookmark",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

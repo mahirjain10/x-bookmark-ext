@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X Bookmark Extension</title>
+    <!-- <link rel="stylesheet" href="tailwind.css"> -->
+    <script src="./script/tailwind_405.js"></script>
+    <style>
+        :root {
+            --primary: #1e90ff;
+            --primary-dark: #104e8b;
+            --background-light: #f7f9fc;
+            --background-dark: #1a2236;
+            --text-light: #2d3748;
+            --text-dark: #e2e8f0;
+            --card-light: #ffffff;
+            --card-dark: #2d3748;
+            --border-light: #e2e8f0;
+            --border-dark: #4a5568;
+        }
+
+        .light {
+            --bg: var(--background-light);
+            --text: var(--text-light);
+            --card: var(--card-light);
+            --border: var(--border-light);
+        }
+
+        .dark {
+            --bg: var(--background-dark);
+            --text: var(--text-dark);
+            --card: var(--card-dark);
+            --border: var(--border-dark);
+        }
+    </style>
+</head>
+
+<body
+    class="font-sans bg-[var(--bg)] text-[var(--text)] w-[350px] min-h-[400px] m-0 p-0 overflow-y-auto text-sm transition-all duration-300 box-border">
+    <div class="p-3">
+        <div class="flex justify-between items-center mb-2">
+            <h1 class="text-lg font-bold">X Bookmarks</h1>
+            <div class="flex gap-2">
+                <button id="mode-btn"
+                    class="flex items-center gap-1 px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs min-w-6">
+                    <span id="mode-icon">🌙</span> Dark
+                </button>
+                <span class="text-xs text-gray-500">Mar 06, 2025</span>
+            </div>
+        </div>
+
+        <input type="text" id="search-bar" class="w-full p-1.5 border border-[var(--border)] rounded mb-2 box-border"
+            placeholder="Search bookmarks...">
+        <div class="flex gap-2 mb-2">
+            <button id="add-bookmark-btn"
+                class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs">Add Bookmark</button>
+            <button id="add-folder-btn"
+                class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs">Add Folder</button>
+        </div>
+
+        <div id="bookmark-input-container" class="hidden mb-2">
+            <input type="text" id="bookmark-title"
+                class="w-full p-1.5 border border-[var(--border)] rounded mb-2 box-border" placeholder="Title">
+            <input type="text" id="bookmark-url"
+                class="w-full p-1.5 border border-[var(--border)] rounded mb-2 box-border" placeholder="URL">
+            <button id="submit-bookmark"
+                class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs">Save</button>
+        </div>
+
+        <div id="folder-input-container" class="hidden mb-2">
+            <input type="text" id="folder-name"
+                class="w-full p-1.5 border border-[var(--border)] rounded mb-2 box-border" placeholder="Folder Name">
+            <button id="submit-folder"
+                class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs">Save</button>
+        </div>
+
+        <div class="flex items-center gap-2 mb-2">
+            <button id="back-btn"
+                class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs min-w-6 disabled:bg-[var(--border)] disabled:cursor-not-allowed"
+                disabled> <- </button>
+                    <button id="forward-btn"
+                        class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs min-w-6 disabled:bg-[var(--border)] disabled:cursor-not-allowed"
+                        disabled>-></button>
+                    <div id="breadcrumbs"
+                        class="flex-1 flex items-center gap-1.5 text-xs overflow-x-auto whitespace-nowrap"></div>
+        </div>
+
+        <div id="content-list" class="space-y-1"></div>
+    </div>
+    <script src="./script/external.js"></script>
+</body>
+
+</html>
