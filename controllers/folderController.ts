@@ -192,9 +192,7 @@ export const getUserFolders = async (
   res: Response
 ): Promise<any> => {
   try {
-    const folders = await Folder.find({ userId: req.params.userId }).populate(
-      "bookmarks"
-    );
+    const folders = await Folder.find({ userId: req.params.userId });
     return sendResponse(res, 200, "Folders retrieved successfully", folders);
   } catch (error: any) {
     console.error("Error fetching folders:", error);
