@@ -192,14 +192,16 @@ export const getUserFolders = async (
   res: Response
 ): Promise<any> => {
   try {
-    const folders = await Folder.find({ userId: req.params.userId });
+    const folders = await Folder.find({ userId: req.params.userId }).populate({
+      path: "parentFolder",
+      select: "name", // Specify fields you want from parentFolder
+    });
     return sendResponse(res, 200, "Folders retrieved successfully", folders);
   } catch (error: any) {
     console.error("Error fetching folders:", error);
     return sendResponse(res, 500, "Internal Server Error", null, error.message);
   }
 };
-
 export const copyFolder = async (req: Request, res: Response): Promise<any> => {
   try {
     const { newName } = req.body; // User-specified name (optional)

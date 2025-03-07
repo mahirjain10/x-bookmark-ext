@@ -12,11 +12,11 @@ import {
 const router = express.Router();
 
 // Folder Routes
-router.post("/folders", createFolder);
-router.delete("/folders/:id", deleteFolder);
-router.put("/folders/:id", renameFolder);
-router.put("/folders/:id/move", moveFolder);
-router.get("/folders/:userId", getUserFolders);
-router.post("/folders/:id/copy", copyFolder);
+router.post("/", createFolder);
+router.delete("/:id", deleteFolder);
+router.put("/:id", renameFolder);
+router.put("/:id/move", moveFolder);
+router.get("/:userId", getUserFolders);
+router.post("/:id/copy", copyFolder);
 
 export default router;
