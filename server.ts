@@ -13,15 +13,16 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-connectDB();
+// Connect to MongoDB before starting the server
+connectDB().then(() => {
+  app.use("/folders", folderRoutes);
+  app.use("/search", searchRoutes);
 
-app.use("/folders", folderRoutes);
-app.use("/search", searchRoutes);
+  app.get("/", (req, res) => {
+    res.send("Hello, X-Bookmark Server!");
+  });
 
-app.get("/", (req, res) => {
-  res.send("Hello, X-Bookmark Server!");
-});
-
-app.listen(port, () => {
-  console.log(`🚀 Server is running on port ${port}`);
+  app.listen(port, () => {
+    console.log(`🚀 Server is running on port ${port}`);
+  });
 });

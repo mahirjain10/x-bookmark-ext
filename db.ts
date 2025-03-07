@@ -1,10 +1,9 @@
 import mongoose from "mongoose";
-import { MongoClient, ServerApiVersion } from "mongodb";
 import dotenv from "dotenv";
 
 dotenv.config(); // Load environment variables
 
-const uri = process.env.MONGO_URI as string; // Get URI from .env
+const uri = process.env.MONGO_URI as string;
 
 if (!uri) {
   throw new Error(
@@ -12,22 +11,15 @@ if (!uri) {
   );
 }
 
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
-
 export async function connectDB() {
   try {
-    await client.connect();
-    await client.db("admin").command({ ping: 1 });
+    await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 10000, // 10 seconds timeout
+    });
+
     console.log("✅ Successfully connected to MongoDB!");
   } catch (error) {
     console.error("❌ MongoDB connection failed:", error);
-  } finally {
-    await client.close();
+    process.exit(1); // Exit the process if connection fails
   }
 }
