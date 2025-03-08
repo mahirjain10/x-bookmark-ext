@@ -86,7 +86,7 @@
         <div class="flex items-center gap-2 mb-2">
             <button id="back-btn"
                 class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs min-w-6 disabled:bg-[var(--border)] disabled:cursor-not-allowed"
-                disabled><-< /button>
+                disabled><- </button>
                     <button id="forward-btn"
                         class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs min-w-6 disabled:bg-[var(--border)] disabled:cursor-not-allowed"
                         disabled>-></button>
@@ -98,44 +98,86 @@
     </div>
 
     <script>
-        const dummyData = {
-            folders: [
-                {
-                    _id: "root",
-                    userId: "user123",
-                    name: "Root",
-                    parentFolder: null,
-                    bookmarks: [
-                        { _id: "bm1", title: "Google", url: "https://google.com", createdAt: "2025-03-01T10:00:00Z" }
-                    ],
-                    subFolders: [
-                        {
-                            _id: "folder1",
-                            userId: "user123",
-                            name: "Work",
-                            parentFolder: "root",
-                            bookmarks: [
-                                { _id: "bm2", title: "Docs", url: "https://docs.google.com", createdAt: "2025-03-02T14:30:00Z" }
-                            ],
-                            subFolders: []
-                        },
-                        {
-                            _id: "folder2",
-                            userId: "user123",
-                            name: "Personal",
-                            parentFolder: "root",
-                            bookmarks: [
-                                { _id: "bm3", title: "Netflix", url: "https://netflix.com", createdAt: "2025-03-03T09:15:00Z" },
-                                { _id: "bm4", title: "YouTube", url: "https://youtube.com", createdAt: "2025-03-04T18:45:00Z" }
-                            ],
-                            subFolders: []
-                        }
-                    ]
-                }
-            ]
+        // Dummy bookmarks to keep
+        const dummyBookmarks = [
+            { _id: "bm1", title: "Google", url: "https://google.com", createdAt: "2025-03-01T10:00:00Z" },
+            { _id: "bm2", title: "Docs", url: "https://docs.google.com", createdAt: "2025-03-02T14:30:00Z" },
+            { _id: "bm3", title: "Netflix", url: "https://netflix.com", createdAt: "2025-03-03T09:15:00Z" },
+            { _id: "bm4", title: "YouTube", url: "https://youtube.com", createdAt: "2025-03-04T18:45:00Z" }
+        ];
+
+        // API response
+        const apiResponse = {
+            "statusCode": 200,
+            "success": true,
+            "message": "Folders retrieved successfully",
+            "data": [
+                { "_id": "67cb4045a31dbffea6a92673", "userId": "user1234", "name": "My Documents's child v1", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T18:51:49.953Z", "updatedAt": "2025-03-07T18:51:49.953Z", "__v": 0 },
+                { "_id": "67cb404ea31dbffea6a92676", "userId": "user1234", "name": "My Documents's child v2", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T18:51:58.472Z", "updatedAt": "2025-03-07T18:51:58.472Z", "__v": 0 },
+                { "_id": "67cb4065a31dbffea6a92679", "userId": "user1234", "name": "My Documents's child v3", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T18:52:21.906Z", "updatedAt": "2025-03-07T18:52:21.906Z", "__v": 0 },
+                { "_id": "67cb1f23a262319ffd169221", "userId": "user1234", "name": "My Documents", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T16:30:27.837Z", "updatedAt": "2025-03-07T16:30:27.837Z", "__v": 0 },
+                { "_id": "67cb1f36a262319ffd169225", "userId": "user1234", "name": "My Documents 2", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T16:30:46.736Z", "updatedAt": "2025-03-07T16:30:46.736Z", "__v": 0 },
+                { "_id": "67cb1f3aa262319ffd169228", "userId": "user1234", "name": "My Documents 3", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T16:30:50.137Z", "updatedAt": "2025-03-07T16:30:50.137Z", "__v": 0 },
+                { "_id": "67cb1f3ca262319ffd16922b", "userId": "user1234", "name": "My Documents 4", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T16:30:52.380Z", "updatedAt": "2025-03-07T16:30:52.380Z", "__v": 0 },
+                { "_id": "67cb1f3da262319ffd16922e", "userId": "user1234", "name": "My Documents 5", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T16:30:53.512Z", "updatedAt": "2025-03-07T16:30:53.512Z", "__v": 0 },
+                { "_id": "67cb1f62a262319ffd169231", "userId": "user1234", "name": "My Documents's child 1", "isParentRoot": false, "parentFolder": { "_id": "67cb1f23a262319ffd169221", "name": "My Documents" }, "createdAt": "2025-03-07T16:31:30.996Z", "updatedAt": "2025-03-07T16:31:30.996Z", "__v": 0 },
+                { "_id": "67cb1f76a262319ffd169235", "userId": "user1234", "name": "My Documents's child 2", "isParentRoot": false, "parentFolder": { "_id": "67cb1f23a262319ffd169221", "name": "My Documents" }, "createdAt": "2025-03-07T16:31:50.116Z", "updatedAt": "2025-03-07T16:31:50.116Z", "__v": 0 },
+                { "_id": "67cb1f77a262319ffd169238", "userId": "user1234", "name": "My Documents's child 3", "isParentRoot": false, "parentFolder": { "_id": "67cb1f23a262319ffd169221", "name": "My Documents" }, "createdAt": "2025-03-07T16:31:51.200Z", "updatedAt": "2025-03-07T16:31:51.200Z", "__v": 0 },
+                { "_id": "67cb1f78a262319ffd16923b", "userId": "user1234", "name": "renamed folder v1", "isParentRoot": false, "parentFolder": { "_id": "67cb1f23a262319ffd169221", "name": "My Documents" }, "createdAt": "2025-03-07T16:31:52.424Z", "updatedAt": "2025-03-07T16:35:19.302Z", "__v": 0 },
+                { "_id": "67cb1f79a262319ffd16923e", "userId": "user1234", "name": "My Documents's child", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T16:31:53.788Z", "updatedAt": "2025-03-07T17:32:14.138Z", "__v": 0 },
+                { "_id": "67cb55b368c1c9dd4bcbf9e0", "userId": "user1234", "name": "My Docusnts's child v3", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T20:23:15.854Z", "updatedAt": "2025-03-07T20:23:15.854Z", "__v": 0 },
+                { "_id": "67cb56a93a447dddb203b6a7", "userId": "user1234", "name": "My Docusments's child v3", "isParentRoot": true, "parentFolder": null, "createdAt": "2025-03-07T20:27:21.776Z", "updatedAt": "2025-03-07T20:27:21.776Z", "__v": 0 }
+            ],
+            "error": null
         };
 
-        let currentFolder = dummyData.folders[0];
+        // Convert API response to the required format
+        function convertApiResponseToFolderStructure(apiResponse) {
+            const foldersMap = new Map();
+            const rootFolder = {
+                _id: "root",
+                userId: "user1234",
+                name: "Root",
+                parentFolder: null,
+                bookmarks: [dummyBookmarks[0]], // Adding some dummy bookmarks to root
+                subFolders: []
+            };
+
+            // Initialize all folders with empty subFolders and bookmarks
+            apiResponse.data.forEach(folder => {
+                foldersMap.set(folder._id, {
+                    _id: folder._id,
+                    userId: folder.userId,
+                    name: folder.name,
+                    parentFolder: folder.parentFolder ? folder.parentFolder._id : null,
+                    bookmarks: [],
+                    subFolders: []
+                });
+            });
+
+            // Assign dummy bookmarks to some folders for demonstration
+            foldersMap.get("67cb1f23a262319ffd169221").bookmarks = [dummyBookmarks[1]]; // My Documents
+            foldersMap.get("67cb1f62a262319ffd169231").bookmarks = [dummyBookmarks[2]]; // My Documents's child 1
+            foldersMap.get("67cb1f76a262319ffd169235").bookmarks = [dummyBookmarks[3]]; // My Documents's child 2
+
+            // Build the hierarchy
+            apiResponse.data.forEach(folder => {
+                const currentFolder = foldersMap.get(folder._id);
+                if (folder.isParentRoot && !folder.parentFolder) {
+                    rootFolder.subFolders.push(currentFolder);
+                } else if (folder.parentFolder) {
+                    const parent = foldersMap.get(folder.parentFolder._id);
+                    if (parent) {
+                        parent.subFolders.push(currentFolder);
+                    }
+                }
+            });
+
+            return { folders: [rootFolder] };
+        }
+
+        const folderData = convertApiResponseToFolderStructure(apiResponse);
+        let currentFolder = folderData.folders[0];
         let folderStack = [currentFolder];
         let forwardStack = [];
 
@@ -311,7 +353,7 @@
             if (name) {
                 const newFolder = {
                     _id: "folder" + Date.now(),
-                    userId: "user123",
+                    userId: "user1234",
                     name,
                     parentFolder: currentFolder._id,
                     bookmarks: [],
