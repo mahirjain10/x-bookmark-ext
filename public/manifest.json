@@ -9,7 +9,7 @@
   "host_permissions": ["http://localhost:5000/*"],
 
   "action": {
-    "default_popup": "public/index.html",
+    "default_popup": "./index.html",
     "default_title": "Manage Your Bookmarks"
   },
 
@@ -18,7 +18,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["public/tailwind.css"],
+      "resources": ["./public/tailwind.css"],
       "matches": ["<all_urls>"]
     }
   ]

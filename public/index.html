@@ -4,9 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>X Bookmark Extension</title>
-    <!-- <link rel="stylesheet" href="tailwind.css"> -->
     <script src="./script/tailwind_405.js"></script>
+    <title>X Bookmark Extension</title>
     <style>
         :root {
             --primary: #1e90ff;
@@ -51,8 +50,16 @@
             </div>
         </div>
 
-        <input type="text" id="search-bar" class="w-full p-1.5 border border-[var(--border)] rounded mb-2 box-border"
-            placeholder="Search bookmarks...">
+        <div class="flex flex-col gap-2 mb-2">
+            <input type="text" id="search-bar" class="w-full p-1.5 border border-[var(--border)] rounded box-border"
+                placeholder="Search bookmarks...">
+            <select id="search-filter" class="w-full p-1.5 border border-[var(--border)] rounded box-border text-xs">
+                <option value="all">All</option>
+                <option value="folders">Folders</option>
+                <option value="bookmarks">Bookmarks</option>
+            </select>
+        </div>
+
         <div class="flex gap-2 mb-2">
             <button id="add-bookmark-btn"
                 class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs">Add Bookmark</button>
@@ -79,7 +86,7 @@
         <div class="flex items-center gap-2 mb-2">
             <button id="back-btn"
                 class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs min-w-6 disabled:bg-[var(--border)] disabled:cursor-not-allowed"
-                disabled> <- </button>
+                disabled><-< /button>
                     <button id="forward-btn"
                         class="px-2 py-1 bg-[var(--primary)] text-white rounded cursor-pointer text-xs min-w-6 disabled:bg-[var(--border)] disabled:cursor-not-allowed"
                         disabled>-></button>
@@ -89,7 +96,254 @@
 
         <div id="content-list" class="space-y-1"></div>
     </div>
-    <script src="./script/external.js"></script>
+
+    <script>
+        const dummyData = {
+            folders: [
+                {
+                    _id: "root",
+                    userId: "user123",
+                    name: "Root",
+                    parentFolder: null,
+                    bookmarks: [
+                        { _id: "bm1", title: "Google", url: "https://google.com", createdAt: "2025-03-01T10:00:00Z" }
+                    ],
+                    subFolders: [
+                        {
+                            _id: "folder1",
+                            userId: "user123",
+                            name: "Work",
+                            parentFolder: "root",
+                            bookmarks: [
+                                { _id: "bm2", title: "Docs", url: "https://docs.google.com", createdAt: "2025-03-02T14:30:00Z" }
+                            ],
+                            subFolders: []
+                        },
+                        {
+                            _id: "folder2",
+                            userId: "user123",
+                            name: "Personal",
+                            parentFolder: "root",
+                            bookmarks: [
+                                { _id: "bm3", title: "Netflix", url: "https://netflix.com", createdAt: "2025-03-03T09:15:00Z" },
+                                { _id: "bm4", title: "YouTube", url: "https://youtube.com", createdAt: "2025-03-04T18:45:00Z" }
+                            ],
+                            subFolders: []
+                        }
+                    ]
+                }
+            ]
+        };
+
+        let currentFolder = dummyData.folders[0];
+        let folderStack = [currentFolder];
+        let forwardStack = [];
+
+        function renderBreadcrumbs() {
+            const breadcrumbs = document.getElementById("breadcrumbs");
+            breadcrumbs.innerHTML = "";
+            folderStack.forEach((folder, index) => {
+                const span = document.createElement("span");
+                span.className = "text-[var(--primary)] cursor-pointer hover:underline";
+                span.textContent = folder.name;
+                span.onclick = () => navigateToFolder(index);
+                breadcrumbs.appendChild(span);
+                if (index < folderStack.length - 1) {
+                    breadcrumbs.appendChild(document.createTextNode(" / "));
+                }
+            });
+        }
+
+        function renderContent() {
+            const contentList = document.getElementById("content-list");
+            contentList.innerHTML = "";
+
+            (currentFolder.subFolders || []).forEach(folder => {
+                const div = document.createElement("div");
+                div.className = "relative p-1.5 rounded hover:bg-[rgba(30,144,255,0.1)] transition-colors duration-200 flex items-center justify-between";
+                div.innerHTML = `
+                    <span class="before:content-['📁'] before:mr-2">${folder.name}</span>
+                    <span class="menu-btn cursor-pointer text-gray-500 hover:text-[var(--primary)]">⋯</span>
+                `;
+                div.onclick = (e) => {
+                    if (!e.target.classList.contains("menu-btn")) enterFolder(folder);
+                };
+                const menu = document.createElement("div");
+                menu.className = "absolute right-2 top-full bg-[var(--card)] border border-[var(--border)] rounded shadow-md z-10 hidden";
+                menu.innerHTML = `
+                    <div class="p-1.5 cursor-pointer hover:bg-[var(--primary)] hover:text-white">Edit</div>
+                    <div class="p-1.5 cursor-pointer hover:bg-[var(--primary)] hover:text-white">Delete</div>
+                `;
+                div.appendChild(menu);
+                contentList.appendChild(div);
+            });
+
+            currentFolder.bookmarks.forEach(bookmark => {
+                const div = document.createElement("div");
+                div.className = "p-2 border-b border-[var(--border)] hover:bg-[rgba(30,144,255,0.1)] transition-colors duration-200 relative";
+                const date = new Date(bookmark.createdAt);
+                div.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start gap-2">
+                            <div class="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0"></div>
+                            <div>
+                                <div class="font-bold">Bookmark</div>
+                                <a href="${bookmark.url}" target="_blank" class="text-[var(--primary)] hover:underline">${bookmark.title}</a>
+                                <div class="text-xs text-gray-500">${date.toLocaleString()}</div>
+                            </div>
+                        </div>
+                        <span class="menu-btn cursor-pointer text-gray-500 hover:text-[var(--primary)]">⋯</span>
+                    </div>
+                `;
+                const menu = document.createElement("div");
+                menu.className = "absolute right-2 top-full bg-[var(--card)] border border-[var(--border)] rounded shadow-md z-10 hidden";
+                menu.innerHTML = `
+                    <div class="p-1.5 cursor-pointer hover:bg-[var(--primary)] hover:text-white">Edit</div>
+                    <div class="p-1.5 cursor-pointer hover:bg-[var(--primary)] hover:text-white">Delete</div>
+                `;
+                div.appendChild(menu);
+                contentList.appendChild(div);
+            });
+
+            document.querySelectorAll(".menu-btn").forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const menu = btn.nextElementSibling;
+                    menu.style.display = menu.style.display === "block" ? "none" : "block";
+                };
+            });
+
+            document.getElementById("back-btn").disabled = folderStack.length === 1;
+            document.getElementById("forward-btn").disabled = forwardStack.length === 0;
+        }
+
+        function enterFolder(folder) {
+            forwardStack = [];
+            currentFolder = folder;
+            folderStack.push(folder);
+            renderBreadcrumbs();
+            renderContent();
+        }
+
+        function navigateToFolder(index) {
+            const removedFolders = folderStack.slice(index + 1);
+            forwardStack = removedFolders.reverse().concat(forwardStack);
+            folderStack = folderStack.slice(0, index + 1);
+            currentFolder = folderStack[folderStack.length - 1];
+            renderBreadcrumbs();
+            renderContent();
+        }
+
+        document.getElementById("back-btn").onclick = () => {
+            if (folderStack.length > 1) {
+                forwardStack.unshift(folderStack.pop());
+                currentFolder = folderStack[folderStack.length - 1];
+                renderBreadcrumbs();
+                renderContent();
+            }
+        };
+
+        document.getElementById("forward-btn").onclick = () => {
+            if (forwardStack.length > 0) {
+                const nextFolder = forwardStack.shift();
+                folderStack.push(nextFolder);
+                currentFolder = nextFolder;
+                renderBreadcrumbs();
+                renderContent();
+            }
+        };
+
+        const modeBtn = document.getElementById("mode-btn");
+        const modeIcon = document.getElementById("mode-icon");
+        modeBtn.onclick = () => {
+            document.documentElement.classList.toggle("light");
+            document.documentElement.classList.toggle("dark");
+            const isDark = document.documentElement.classList.contains("dark");
+            modeIcon.textContent = isDark ? "☀️" : "🌙";
+            modeBtn.childNodes[1].textContent = isDark ? "Light" : "Dark";
+        };
+
+        const addBookmarkBtn = document.getElementById("add-bookmark-btn");
+        const bookmarkInputContainer = document.getElementById("bookmark-input-container");
+        const bookmarkTitle = document.getElementById("bookmark-title");
+        const bookmarkUrl = document.getElementById("bookmark-url");
+        const submitBookmark = document.getElementById("submit-bookmark");
+
+        addBookmarkBtn.onclick = () => {
+            bookmarkInputContainer.style.display = "block";
+            addBookmarkBtn.style.display = "none";
+            document.getElementById("add-folder-btn").style.display = "none";
+        };
+
+        submitBookmark.onclick = () => {
+            const title = bookmarkTitle.value.trim();
+            const url = bookmarkUrl.value.trim();
+            if (title && url) {
+                const newBookmark = {
+                    _id: "bm" + Date.now(),
+                    title,
+                    url,
+                    createdAt: new Date().toISOString()
+                };
+                currentFolder.bookmarks.push(newBookmark);
+                bookmarkTitle.value = "";
+                bookmarkUrl.value = "";
+                bookmarkInputContainer.style.display = "none";
+                addBookmarkBtn.style.display = "inline-block";
+                document.getElementById("add-folder-btn").style.display = "inline-block";
+                renderContent();
+            }
+        };
+
+        const addFolderBtn = document.getElementById("add-folder-btn");
+        const folderInputContainer = document.getElementById("folder-input-container");
+        const folderName = document.getElementById("folder-name");
+        const submitFolder = document.getElementById("submit-folder");
+
+        addFolderBtn.onclick = () => {
+            folderInputContainer.style.display = "block";
+            addFolderBtn.style.display = "none";
+            document.getElementById("add-bookmark-btn").style.display = "none";
+        };
+
+        submitFolder.onclick = () => {
+            const name = folderName.value.trim();
+            if (name) {
+                const newFolder = {
+                    _id: "folder" + Date.now(),
+                    userId: "user123",
+                    name,
+                    parentFolder: currentFolder._id,
+                    bookmarks: [],
+                    subFolders: []
+                };
+                currentFolder.subFolders = currentFolder.subFolders || [];
+                currentFolder.subFolders.push(newFolder);
+                folderName.value = "";
+                folderInputContainer.style.display = "none";
+                addFolderBtn.style.display = "inline-block";
+                document.getElementById("add-bookmark-btn").style.display = "inline-block";
+                renderContent();
+            }
+        };
+
+        document.addEventListener("click", (e) => {
+            if (!e.target.classList.contains("menu-btn")) {
+                document.querySelectorAll(".menu").forEach(menu => menu.style.display = "none");
+            }
+        });
+
+        document.getElementById("search-bar").oninput = (e) => {
+            console.log("Search:", e.target.value, "Filter:", document.getElementById("search-filter").value);
+        };
+
+        document.getElementById("search-filter").onchange = (e) => {
+            console.log("Filter changed to:", e.target.value);
+        };
+
+        renderBreadcrumbs();
+        renderContent();
+    </script>
 </body>
 
 </html>
