@@ -89,10 +89,31 @@ export const deleteFolder = async (
     const folder = (await Folder.findById(req.params.id)) as IFolder | null;
     if (!folder) return sendResponse(res, 404, "Folder not found");
 
-    await Bookmark.deleteMany({ folder: folder._id }); // Delete bookmarks inside the folder
-    await Folder.findByIdAndDelete(req.params.id);
+    // Recursive function to delete folder and all its children
+    const deleteFolderRecursively = async (folderId: string): Promise<void> => {
+      // Delete all bookmarks in the current folder
+      await Bookmark.deleteMany({ folder: folderId });
 
-    return sendResponse(res, 200, "Folder and its bookmarks deleted");
+      // Find all child folders
+      const childFolders = await Folder.find({ parentFolder: folderId });
+
+      // Recursively delete each child folder
+      for (const childFolder of childFolders) {
+        await deleteFolderRecursively(childFolder._id);
+      }
+
+      // Delete the current folder
+      await Folder.findByIdAndDelete(folderId);
+    };
+
+    // Start the recursive deletion with the target folder
+    await deleteFolderRecursively(req.params.id);
+
+    return sendResponse(
+      res,
+      200,
+      "Folder and all its contents deleted successfully"
+    );
   } catch (error: any) {
     console.error("Error deleting folder:", error);
     return sendResponse(res, 500, "Internal Server Error", null, error.message);
