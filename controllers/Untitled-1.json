@@ -1,0 +1,326 @@
+// {
+//   "createBookmarkTests": [
+//     {
+//       "description": "Successfully create a bookmark with all fields",
+//       "request": {
+//         "method": "POST",
+//         "url": "/api/bookmarks/",
+//         "body": {
+//           "userId": "user123",
+//           "title": "Test Bookmark",
+//           "url": "https://example.com",
+//           "folder": "folder456"
+//         },
+//         "headers": {
+//           "Content-Type": "application/json"
+//         }
+//       },
+//       "expectedResponse": {
+//         "statusCode": 201,
+//         "success": true,
+//         "message": "Bookmark created successfully",
+//         "data": {
+//           "userId": "user123",
+//           "title": "Test Bookmark",
+//           "url": "https://example.com",
+//           "folder": "folder456",
+//           "_id": "any",
+//           "createdAt": "any"
+//         },
+//         "error": null
+//       },
+//       "preconditions": {
+//         "folderExists": true,
+//         "folderUserIdMatches": true
+//       }
+//     },
+//     {
+//       "description": "Successfully create a bookmark without folder",
+//       "request": {
+//         "method": "POST",
+//         "url": "/api/bookmarks/",
+//         "body": {
+//           "userId": "user123",
+//           "title": "Test Bookmark No Folder",
+//           "url": "https://example.com"
+//         },
+//         "headers": {
+//           "Content-Type": "application/json"
+//         }
+//       },
+//       "expectedResponse": {
+//         "statusCode": 201,
+//         "success": true,
+//         "message": "Bookmark created successfully",
+//         "data": {
+//           "userId": "user123",
+//           "title": "Test Bookmark No Folder",
+//           "url": "https://example.com",
+//           "folder": null,
+//           "_id": "any",
+//           "createdAt": "any"
+//         },
+//         "error": null
+//       }
+//     },
+//     {
+//       "description": "Fail to create bookmark with missing required fields",
+//       "request": {
+//         "method": "POST",
+//         "url": "/api/bookmarks/",
+//         "body": {
+//           "title": "Test Bookmark"
+//         },
+//         "headers": {
+//           "Content-Type": "application/json"
+//         }
+//       },
+//       "expectedResponse": {
+//         "statusCode": 500,
+//         "success": false,
+//         "message": "Error creating bookmark",
+//         "data": null,
+//         "error": "any"
+//       }
+//     },
+//     {
+//       "description": "Fail to create bookmark with non-existent folder",
+//       "request": {
+//         "method": "POST",
+//         "url": "/api/bookmarks/",
+//         "body": {
+//           "userId": "user123",
+//           "title": "Test Bookmark",
+//           "url": "https://example.com",
+//           "folder": "nonexistent789"
+//         },
+//         "headers": {
+//           "Content-Type": "application/json"
+//         }
+//       },
+//       "expectedResponse": {
+//         "statusCode": 404,
+//         "success": false,
+//         "message": "Folder not found",
+//         "data": null,
+//         "error": null
+//       },
+//       "preconditions": {
+//         "folderExists": false
+//       }
+//     },
+//     {
+//       "description": "Fail to create bookmark with folder owned by different user",
+//       "request": {
+//         "method": "POST",
+//         "url": "/api/bookmarks/",
+//         "body": {
+//           "userId": "user123",
+//           "title": "Test Bookmark",
+//           "url": "https://example.com",
+//           "folder": "folder456"
+//         },
+//         "headers": {
+//           "Content-Type": "application/json"
+//         }
+//       },
+//       "expectedResponse": {
+//         "statusCode": 403,
+//         "success": false,
+//         "message": "Folder belongs to different user",
+//         "data": null,
+//         "error": null
+//       },
+//       "preconditions": {
+//         "folderExists": true,
+//         "folderUserIdMatches": false
+//       }
+//     },
+//     {
+//       // faield to need to add validation
+//       "description": "Fail to create bookmark with invalid URL",
+//       "request": {
+//         "method": "POST",
+//         "url": "/api/bookmarks/",
+//         "body": {
+//           "userId": "user123",
+//           "title": "Test Bookmark",
+//           "url": "not-a-valid-url"
+//         },
+//         "headers": {
+//           "Content-Type": "application/json"
+//         }
+//       },
+//       "expectedResponse": {
+//         "statusCode": 500,
+//         "success": false,
+//         "message": "Error creating bookmark",
+//         "data": null,
+//         "error": "any"
+//       }
+//     }
+//   ]
+// }
+
+{
+  "getBookmarksByUserIdTests": [
+    {
+      "description": "Successfully retrieve multiple bookmarks for a user",
+      "request": {
+        "method": "GET",
+        "url": "/api/bookmarks/user/user123",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expectedResponse": {
+        "statusCode": 200,
+        "success": true,
+        "message": "Bookmarks retrieved successfully",
+        "data": [
+          {
+            "_id": "any",
+            "userId": "user123",
+            "title": "Bookmark 1",
+            "url": "https://example1.com",
+            "folder": "folder456",
+            "createdAt": "any"
+          },
+          {
+            "_id": "any",
+            "userId": "user123",
+            "title": "Bookmark 2",
+            "url": "https://example2.com",
+            "folder": null,
+            "createdAt": "any"
+          }
+        ],
+        "error": null
+      },
+      "preconditions": {
+        "bookmarks": [
+          {
+            "userId": "user123",
+            "title": "Bookmark 1",
+            "url": "https://example1.com",
+            "folder": "folder456"
+          },
+          {
+            "userId": "user123",
+            "title": "Bookmark 2",
+            "url": "https://example2.com"
+          }
+        ],
+        "folderExists": true
+      }
+    },
+    {
+      "description": "Successfully retrieve empty array when user has no bookmarks",
+      "request": {
+        "method": "GET",
+        "url": "/api/bookmarks/user/user456",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expectedResponse": {
+        "statusCode": 200,
+        "success": true,
+        "message": "Bookmarks retrieved successfully",
+        "data": [],
+        "error": null
+      },
+      "preconditions": {
+        "bookmarks": []
+      }
+    },
+    {
+      "description": "Successfully retrieve bookmarks with populated folder details",
+      "request": {
+        "method": "GET",
+        "url": "/api/bookmarks/user/user789",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expectedResponse": {
+        "statusCode": 200,
+        "success": true,
+        "message": "Bookmarks retrieved successfully",
+        "data": [
+          {
+            "_id": "any",
+            "userId": "user789",
+            "title": "Test Bookmark",
+            "url": "https://test.com",
+            "folder": {
+              "_id": "folder123",
+              "name": "Test Folder",
+              "userId": "user789",
+              "isParentRoot": false,
+              "parentFolder": "parentFolder456"
+            },
+            "createdAt": "any"
+          }
+        ],
+        "error": null
+      },
+      "preconditions": {
+        "bookmarks": [
+          {
+            "userId": "user789",
+            "title": "Test Bookmark",
+            "url": "https://test.com",
+            "folder": "folder123"
+          }
+        ],
+        "folders": [
+          {
+            "_id": "folder123",
+            "name": "Test Folder",
+            "userId": "user789",
+            "isParentRoot": false,
+            "parentFolder": "parentFolder456"
+          }
+        ]
+      }
+    },
+    {
+      "description": "Handle invalid userId format",
+      "request": {
+        "method": "GET",
+        "url": "/api/bookmarks/user/invalid@id",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expectedResponse": {
+        "statusCode": 500,
+        "success": false,
+        "message": "Error fetching bookmarks",
+        "data": null,
+        "error": "any"
+      }
+    },
+    {
+      "description": "Handle database connection error",
+      "request": {
+        "method": "GET",
+        "url": "/api/bookmarks/user/user123",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expectedResponse": {
+        "statusCode": 500,
+        "success": false,
+        "message": "Error fetching bookmarks",
+        "data": null,
+        "error": "any"
+      },
+      "preconditions": {
+        "simulateDbError": true
+      }
+    }
+  ]
+}

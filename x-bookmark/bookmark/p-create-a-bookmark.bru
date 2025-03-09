@@ -1,0 +1,19 @@
+meta {
+  name: p-create-a-bookmark
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://x-boomark-ext.onrender.com/bookmark
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+            "userId": "user123",
+            "title": "Test Bookmark No Folder",
+            "url": "https://example.com"
+          }
+}

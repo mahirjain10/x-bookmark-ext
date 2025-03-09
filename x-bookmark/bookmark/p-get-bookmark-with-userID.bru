@@ -1,0 +1,19 @@
+meta {
+  name: p-get-bookmark-with-userID
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://x-boomark-ext.onrender.com/bookmark
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "userId": "user123",
+    "title": "Test Bookmark No Folder",
+    "url": "https://example.com"
+  }
+}
