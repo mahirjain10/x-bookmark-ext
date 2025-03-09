@@ -99,7 +99,8 @@ export const deleteFolder = async (
 
       // Recursively delete each child folder
       for (const childFolder of childFolders) {
-        await deleteFolderRecursively(childFolder._id);
+        const childFolderID = childFolder._id.toString();
+        await deleteFolderRecursively(childFolderID);
       }
 
       // Delete the current folder
