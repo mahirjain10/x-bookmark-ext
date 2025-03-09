@@ -62,6 +62,21 @@
                 transform: rotate(360deg);
             }
         }
+
+        .paste-here-btn {
+            display: none;
+            padding: 0.25rem 0.5rem;
+            background-color: #10b981;
+            color: white;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+
+        .paste-here-btn:hover {
+            background-color: #059669;
+        }
     </style>
 </head>
 
@@ -142,6 +157,7 @@
                         disabled>-></button>
                     <div id="breadcrumbs"
                         class="flex-1 flex items-center gap-1.5 text-xs overflow-x-auto whitespace-nowrap"></div>
+                    <button id="paste-here-btn" class="paste-here-btn">Paste Here</button>
         </div>
 
         <div id="content-list" class="flex-1 overflow-y-auto space-y-1"></div>
@@ -259,23 +275,24 @@
             }
         }
         // Function to set up menu actions for both folders and bookmarks
-        // Function to set up menu actions for both folders and bookmarks
+        // Function to set up menu actions for both folders and bookma
+        // rks
+        // Add these global variables at the top of your script section
+        let pendingMoveFolder = null;
+        let pendingCopyFolder = null;
+        // Inside the <script> tag where setupMenuActions is defined
         function setupMenuActions(container, menu, item, isBookmark = false) {
             const menuBtn = container.querySelector(".menu-btn");
 
             menuBtn.onclick = (e) => {
                 e.stopPropagation();
-
-                // Close all other menus first
                 document.querySelectorAll(".menu").forEach(m => {
                     if (m !== menu) m.style.display = "none";
                 });
-
-                // Toggle this menu
                 menu.style.display = menu.style.display === "block" ? "none" : "block";
             };
 
-            // Edit button functionality
+            // Edit button functionality (unchanged)
             if (menu.querySelector(".edit-btn")) {
                 menu.querySelector(".edit-btn").onclick = (e) => {
                     e.stopPropagation();
@@ -310,9 +327,6 @@
                         const nameElement = container.querySelector(".folder-name");
                         const originalName = nameElement.textContent.trim().replace('📁 ', '');
 
-                        // Store the folder icon separately
-                        const folderIconElement = nameElement.querySelector(".folder-icon");
-
                         nameElement.innerHTML = `<span class="folder-icon">📁</span> <input type="text" class="folder-name-edit p-0.5 border border-[var(--primary)] rounded" value="${originalName}">`;
                         const input = nameElement.querySelector("input");
                         input.focus();
@@ -323,7 +337,6 @@
                             if (newName && newName !== originalName) {
                                 try {
                                     showLoader();
-                                    // Make the API call to update the folder name
                                     const response = await fetch(`https://x-boomark-ext.onrender.com/folders/${item._id}`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
@@ -340,14 +353,12 @@
                                     }
                                 } catch (error) {
                                     console.error('Error updating folder name:', error);
-                                    item.name = newName; // Still update locally even if API fails
+                                    item.name = newName;
                                     showMessage("Failed to update on server, updated locally", false);
                                 } finally {
                                     hideLoader();
                                 }
                             }
-
-                            // Restore the name element with the updated name
                             nameElement.innerHTML = `<span class="folder-icon">📁</span> ${item.name}`;
                         };
 
@@ -358,16 +369,14 @@
                                 nameElement.innerHTML = `<span class="folder-icon">📁</span> ${originalName}`;
                             }
                         };
-
-                        // Prevent click from propagating to parent (which would navigate into folder)
                         input.onclick = (e) => e.stopPropagation();
                     }
                 };
             }
 
-            // Delete button functionality
+            // Delete button functionality (updated for folders)
             if (menu.querySelector(".delete-btn")) {
-                menu.querySelector(".delete-btn").onclick = (e) => {
+                menu.querySelector(".delete-btn").onclick = async (e) => {
                     e.stopPropagation();
                     menu.style.display = "none";
 
@@ -379,23 +388,56 @@
                             showMessage("Bookmark deleted successfully");
                         }
                     } else {
-                        const index = currentFolder.subFolders.findIndex(f => f._id === item._id);
-                        if (index !== -1) {
-                            currentFolder.subFolders.splice(index, 1);
-                            renderContent();
-                            showMessage("Folder deleted successfully");
+                        // Confirm deletion (optional, you can remove this if not needed)
+                        if (!confirm(`Are you sure you want to delete the folder "${item.name}"?`)) return;
+
+                        showLoader();
+                        try {
+                            const response = await fetch(`https://x-boomark-ext.onrender.com/folders/${item._id}`, {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+
+                            const result = await response.json();
+
+                            if (response.ok && result.success) {
+                                const index = currentFolder.subFolders.findIndex(f => f._id === item._id);
+                                if (index !== -1) {
+                                    currentFolder.subFolders.splice(index, 1);
+                                    renderContent();
+                                    showMessage(result.message || `Folder "${item.name}" deleted successfully`, true);
+                                }
+                            } else {
+                                throw new Error(result.message || 'Failed to delete folder');
+                            }
+                        } catch (error) {
+                            console.error('Error deleting folder:', error);
+                            // Optionally, remove locally even if API fails (or not, depending on your preference)
+                            const index = currentFolder.subFolders.findIndex(f => f._id === item._id);
+                            if (index !== -1) {
+                                currentFolder.subFolders.splice(index, 1);
+                                renderContent();
+                                showMessage(`Failed to delete folder on server: ${error.message}, removed locally`, false);
+                            } else {
+                                showMessage(`Failed to delete folder: ${error.message}`, false);
+                            }
+                        } finally {
+                            hideLoader();
                         }
                     }
                 };
             }
 
-            // Add more functionality for move and copy if needed
+            // Move and Copy (unchanged)
             if (!isBookmark) {
                 if (menu.querySelector(".move-btn")) {
                     menu.querySelector(".move-btn").onclick = (e) => {
                         e.stopPropagation();
                         menu.style.display = "none";
-                        showMessage("Move functionality will be implemented soon");
+                        pendingMoveFolder = item;
+                        pendingCopyFolder = null;
+                        document.getElementById("paste-here-btn").style.display = "block";
+                        showMessage("Select a destination folder and click 'Paste Here' to move");
                     };
                 }
 
@@ -403,7 +445,10 @@
                     menu.querySelector(".copy-btn").onclick = (e) => {
                         e.stopPropagation();
                         menu.style.display = "none";
-                        showMessage("Copy functionality will be implemented soon");
+                        pendingCopyFolder = item;
+                        pendingMoveFolder = null;
+                        document.getElementById("paste-here-btn").style.display = "block";
+                        showMessage("Select a destination folder and click 'Paste Here' to copy");
                     };
                 }
             }
@@ -427,15 +472,132 @@
                 span.onclick = () => navigateToFolder(index);
                 breadcrumbs.appendChild(span);
                 if (index < folderStack.length - 1) breadcrumbs.appendChild(document.createTextNode(" / "));
+
             });
         }
+        // Helper function to find folder by ID
+        function findFolderById(folder, id) {
+            if (folder._id === id) return folder;
+            for (const subFolder of folder.subFolders) {
+                const found = findFolderById(subFolder, id);
+                if (found) return found;
+            }
+            return null;
+        }
 
-        // Modify the renderContent function to better handle menus and add inline editing
+        // Add helper function to check if a folder is a descendant
+        function isDescendant(folder, targetId) {
+            if (folder._id === targetId) return true;
+            return folder.subFolders.some(f => isDescendant(f, targetId));
+        }
+        // Add helper function to find parent folder
+        function findParentFolder(folder, folderId) {
+            if (folder.subFolders.some(f => f._id === folderId)) {
+                return folder;
+            }
+            for (const subFolder of folder.subFolders) {
+                const parent = findParentFolder(subFolder, folderId);
+                if (parent) return parent;
+            }
+            return null;
+        }
+
+        // Add paste here button functionality
+        document.getElementById("paste-here-btn").onclick = () => {
+            if (pendingMoveFolder) {
+                moveFolder(pendingMoveFolder, currentFolder._id);
+            } else if (pendingCopyFolder) {
+                copyFolder(pendingCopyFolder, currentFolder._id);
+            }
+        };
+        // Update the moveFolder function
+        async function moveFolder(folder, newParentFolderId) {
+            // Prevent moving a folder into itself or its own children
+            if (newParentFolderId === folder._id || isDescendant(folder, newParentFolderId)) {
+                showMessage("Cannot move folder into itself or its children", false);
+                return;
+            }
+
+            showLoader();
+            try {
+                const response = await fetch(`https://x-boomark-ext.onrender.com/folders/${folder._id}/move`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ newParentFolder: newParentFolderId === "root" ? null : newParentFolderId })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    const originalParent = findParentFolder(folderData.folders[0], folder._id);
+                    const index = originalParent.subFolders.findIndex(f => f._id === folder._id);
+                    if (index !== -1) originalParent.subFolders.splice(index, 1);
+
+                    const newParent = newParentFolderId === "root"
+                        ? folderData.folders[0]
+                        : findFolderById(folderData.folders[0], newParentFolderId);
+                    newParent.subFolders.push(folder);
+                    folder.parentFolder = newParentFolderId === "root" ? null : newParentFolderId;
+
+                    renderContent();
+                    showMessage(`Folder "${folder.name}" pasted successfully`, true);
+                } else {
+                    throw new Error(result.message || 'Failed to move folder');
+                }
+            } catch (error) {
+                console.error('Error moving folder:', error);
+                showMessage(`Failed to move folder: ${error.message}`, false);
+            } finally {
+                hideLoader();
+                document.getElementById("paste-here-btn").style.display = "none";
+                pendingMoveFolder = null;
+            }
+        }
+        async function copyFolder(folder, newParentFolderId) {
+            showLoader();
+            try {
+                const response = await fetch(`https://x-boomark-ext.onrender.com/folders/${folder._id}/copy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ newName: `${folder.name} (Copy)` })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    const newFolder = {
+                        _id: result.data._id,
+                        userId: folder.userId,
+                        name: result.data.name,
+                        parentFolder: newParentFolderId === "root" ? null : newParentFolderId,
+                        bookmarks: [...folder.bookmarks],
+                        subFolders: [] // No need to copy subfolders recursively here unless API does it
+                    };
+
+                    const newParent = newParentFolderId === "root"
+                        ? folderData.folders[0]
+                        : findFolderById(folderData.folders[0], newParentFolderId);
+                    newParent.subFolders.push(newFolder);
+
+                    renderContent();
+                    showMessage(`Folder "${folder.name}" copied successfully`, true);
+                } else {
+                    throw new Error(result.message || 'Failed to copy folder');
+                }
+            } catch (error) {
+                console.error('Error copying folder:', error);
+                showMessage(`Failed to copy folder: ${error.message}`, false);
+            } finally {
+                hideLoader();
+                document.getElementById("paste-here-btn").style.display = "none";
+                pendingCopyFolder = null;
+            }
+        }
+        // Update renderContent function to handle Paste Here visibility correctly
         function renderContent() {
             const contentList = document.getElementById("content-list");
             contentList.innerHTML = "";
 
-            // Render folders
             (currentFolder.subFolders || []).forEach(folder => {
                 const div = document.createElement("div");
                 div.className = "relative p-1.5 rounded hover:bg-[rgba(30,144,255,0.1)] transition-colors duration-200 flex items-center justify-between";
@@ -460,11 +622,9 @@
                 div.appendChild(menu);
                 contentList.appendChild(div);
 
-                // Add event listeners for folder menu items
                 setupMenuActions(div, menu, folder);
             });
 
-            // Render bookmarks
             (currentFolder.bookmarks || []).forEach(bookmark => {
                 const div = document.createElement("div");
                 div.className = "p-2 border-b border-[var(--border)] hover:bg-[rgba(30,144,255,0.1)] transition-colors duration-200 relative";
@@ -491,13 +651,34 @@
                 div.appendChild(menu);
                 contentList.appendChild(div);
 
-                // Add event listeners for bookmark menu items
                 setupMenuActions(div, menu, bookmark, true);
             });
 
             document.getElementById("back-btn").disabled = folderStack.length === 1;
             document.getElementById("forward-btn").disabled = forwardStack.length === 0;
+
+            const pasteHereBtn = document.getElementById("paste-here-btn");
+
+            if (pendingMoveFolder) {
+                // Find the parent folder of the folder being moved
+                const originalParent = findParentFolder(folderData.folders[0], pendingMoveFolder._id);
+
+                // Hide Paste Here if:
+                // 1. We're in the folder being moved
+                // 2. We're in its direct parent
+                if (currentFolder._id === pendingMoveFolder._id ||
+                    (originalParent && currentFolder._id === originalParent._id)) {
+                    pasteHereBtn.style.display = "none";
+                } else {
+                    pasteHereBtn.style.display = "block";
+                }
+            } else if (pendingCopyFolder) {
+                pasteHereBtn.style.display = "block"; // Show everywhere for copy
+            } else {
+                pasteHereBtn.style.display = "none";
+            }
         }
+
     </script>
     <script>
         function enterFolder(folder) {

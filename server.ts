@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import folderRoutes from "./router/folderRoutes";
 import searchRoutes from "./router/searchRoutes";
+import bookmarkRoutes from "./router/bookmarkRoutes";
+
 import { connectDB } from "./db";
 import dotenv from "dotenv";
 
@@ -17,7 +19,7 @@ app.use(express.json());
 connectDB().then(() => {
   app.use("/folders", folderRoutes);
   app.use("/search", searchRoutes);
-
+  app.use("/bookmark", bookmarkRoutes);
   app.get("/", (req, res) => {
     res.send("Hello, X-Bookmark Server!");
   });

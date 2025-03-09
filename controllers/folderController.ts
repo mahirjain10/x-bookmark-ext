@@ -1,8 +1,8 @@
 // controllers.ts
 import { Request, Response } from "express";
 import mongoose, { Types } from "mongoose";
-import Folder, { IFolder } from "../schema/FolderSchema";
-import Bookmark from "../schema/BookmarkSchema";
+import Folder, { IFolder } from "../models/FolderSchema";
+import Bookmark from "../models/BookmarkSchema";
 import sendResponse from "../utils/sendResponse";
 
 export const createFolder = async (

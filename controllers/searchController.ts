@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import Folder from "../schema/FolderSchema"; // Adjust path if needed
+import Folder from "../models/FolderSchema"; // Adjust path if needed
 import sendResponse from "../utils/sendResponse"; // Helper function
 
 export const searchFolder = async (
