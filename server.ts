@@ -22,7 +22,7 @@ connectDB();
 
 // Authentication middleware
 const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
-  if (req.session.tokens && req.session.user?.userId) {
+  if (req.session.user?.userId) {
     next();
   } else {
     res.redirect('/auth/x');
@@ -31,12 +31,12 @@ const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
 
 // Root endpoint
 app.get("/", (req: Request, res: Response) => {
-  const { user, tokens } = req.session;
-  const isLoggedIn = user?.userId && tokens;
+  const { user } = req.session;
+  const isLoggedIn = user?.userId;
   
   res.send(`
     <h1>X-Bookmark Server</h1>
-    ${isLoggedIn && user 
+    ${isLoggedIn 
       ? `<p>Welcome @${user.username}! <a href='/dashboard'>Go to Dashboard</a></p>`
       : `<p><a href='/auth/x'>Login with X</a></p>`
     }
@@ -51,7 +51,7 @@ app.get("/auth/x/callback", handleCallback);
 app.get("/dashboard", isAuthenticated, (req: Request, res: Response) => {
   const { user, tokens } = req.session;
   
-  if (!user || !tokens) {
+  if (!user) {
     res.redirect('/auth/x');
     return;
   }
@@ -70,10 +70,12 @@ app.get("/dashboard", isAuthenticated, (req: Request, res: Response) => {
       <input type="url" name="url" placeholder="URL" required>
       <button type="submit">Add Bookmark</button>
     </form>
-    <hr>
-    <h2>Session Info</h2>
-    <p>Access Token: ${tokens.access_token}</p>
-    <p>Expires at: ${new Date(tokens.expires_at).toLocaleString()}</p>
+    ${tokens ? `
+      <hr>
+      <h2>Session Info</h2>
+      <p>Access Token: ${tokens.access_token}</p>
+      <p>Expires at: ${new Date(tokens.expires_at).toLocaleString()}</p>
+    ` : ''}
   `);
 });
 

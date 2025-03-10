@@ -13,7 +13,7 @@ import {
 } from "../utils/authUtils";
 import User from "../models/AuthSchema";
 
-// Extend express-session types
+// Declare session types
 declare module "express-session" {
   interface SessionData {
     oauthState?: {
@@ -32,7 +32,6 @@ declare module "express-session" {
   }
 }
 
-// Load environment variables once
 dotenv.config();
 
 const {
@@ -44,50 +43,68 @@ const {
   REDIS_URL,
 } = process.env;
 
-// Validate environment variables at startup
+// Validate environment variables
 if (!CLIENT_ID || !CLIENT_SECRET || !CALLBACK_URL || !SESSION_SECRET) {
-  throw new Error(
-    "Missing required environment variables: CLIENT_ID, CLIENT_SECRET, CALLBACK_URL, or SESSION_SECRET"
-  );
+  throw new Error("Missing required environment variables");
 }
 
-// Configure Redis client (only in production)
-const redisClient: RedisClientType | null =
-  NODE_ENV === "production" && REDIS_URL
-    ? createClient({
+// Redis setup (used for sessions)
+let redisClient: RedisClientType | null = null;
+let store: RedisStore | MemoryStore = new MemoryStore(); // Initialize with MemoryStore
+
+async function initializeRedis() {
+  // Only try Redis in production
+  if (NODE_ENV === "production" && REDIS_URL) {
+    try {
+      redisClient = createClient({
         url: REDIS_URL,
         socket: {
-          reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
+          reconnectStrategy: (retries) => {
+            if (retries > 5) {
+              console.warn('Redis connection failed, falling back to MemoryStore');
+              return false; // Stop retrying
+            }
+            return Math.min(retries * 1000, 3000);
+          },
         },
-      })
-    : null;
+      });
 
-if (redisClient) {
-  redisClient.on("error", (err) => console.error("Redis error:", err));
-  redisClient.on("connect", () => console.log("Redis connected"));
-  redisClient
-    .connect()
-    .catch((err) => {
-      console.error("Failed to connect to Redis:", err);
-      process.exit(1); // Exit if Redis fails in production
-    })
-    .then(async () => {
-      // Set reasonable memory limits
-      await Promise.all([
-        redisClient.configSet("maxmemory", "256mb"),
-        redisClient.configSet("maxmemory-policy", "allkeys-lru"),
-      ]).catch((err) => console.error("Redis config error:", err));
-    });
+      redisClient.on("error", (err) => {
+        console.error("Redis error:", err);
+      });
+
+      redisClient.on("connect", () => {
+        console.log("Redis connected successfully");
+        store = new RedisStore({
+          client: redisClient as RedisClientType,
+          prefix: "x-bookmark:",
+        });
+      });
+
+      await redisClient.connect();
+
+      if (redisClient.isOpen) {
+        await Promise.all([
+          redisClient.configSet("maxmemory", "256mb"),
+          redisClient.configSet("maxmemory-policy", "allkeys-lru"),
+        ]).catch(err => console.error("Redis config error:", err));
+      }
+    } catch (error) {
+      console.warn('Failed to initialize Redis, using MemoryStore:', error);
+    }
+  } else {
+    console.log(NODE_ENV === "production" 
+      ? 'No REDIS_URL provided, using MemoryStore' 
+      : 'Development environment, using MemoryStore');
+  }
 }
 
-// Configure session middleware
-const store = NODE_ENV === "production" && redisClient
-  ? new RedisStore({
-      client: redisClient,
-      prefix: "x-bookmark:",
-    })
-  : new MemoryStore();
+// Initialize Redis in background
+initializeRedis().catch(err => {
+  console.error('Failed to initialize Redis:', err);
+});
 
+// Configure session middleware
 export const sessionMiddleware = session({
   store,
   secret: SESSION_SECRET!,
@@ -101,74 +118,58 @@ export const sessionMiddleware = session({
 });
 
 /**
- * Fetch user profile from Twitter API
+ * Fetch user profile from Twitter
  */
 async function getUserProfile(accessToken: string): Promise<any> {
-  try {
-    const response = await axios.get("https://api.twitter.com/2/users/me", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      timeout: 5000,
-    });
-    return response.data.data;
-  } catch (error) {
-    console.error("Error fetching user profile:", (error as AxiosError).message);
-    throw error;
-  }
+  const response = await axios.get("https://api.twitter.com/2/users/me", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 5000,
+  });
+  return response.data.data;
 }
 
 /**
- * Step 1: Start the login flow
- * Redirect user to Twitter's OAuth2 authorization URL
+ * Step 1: Start login flow
  */
-export const startLoginFlow = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const state = generateRandomString(16);
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
+export const startLoginFlow = async (req: Request, res: Response): Promise<any> => {
+  const state = generateRandomString(16);
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    req.session.oauthState = {
-      state,
-      codeVerifier,
-      createdAt: Date.now(),
-    };
+  req.session.oauthState = { state, codeVerifier, createdAt: Date.now() };
+  await new Promise<void>((resolve, reject) => req.session.save((err) => (err ? reject(err) : resolve())));
 
-    await new Promise<void>((resolve, reject) => {
-      req.session.save((err) => (err ? reject(err) : resolve()));
-    });
+  const authParams = new URLSearchParams({
+    response_type: "code",
+    client_id: CLIENT_ID!,
+    redirect_uri: CALLBACK_URL!,
+    scope: "users.read offline.access tweet.read bookmark.read bookmark.write",
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+  });
 
-    const authParams = new URLSearchParams({
-      response_type: "code",
-      client_id: CLIENT_ID!,
-      redirect_uri: CALLBACK_URL!,
-      scope: "users.read offline.access tweet.read bookmark.read bookmark.write",
-      state,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-    });
-
-    const authUrl = `https://twitter.com/i/oauth2/authorize?${authParams.toString()}`;
-    res.redirect(authUrl);
-  } catch (error) {
-    console.error("Error initiating login flow:", (error as Error).message);
-    res.status(500).send("Failed to initiate login flow");
-  }
+  res.redirect(`https://twitter.com/i/oauth2/authorize?${authParams.toString()}`);
 };
 
 /**
  * Step 2: Handle OAuth callback
  */
-export const handleCallback = async (req: Request, res: Response): Promise<void> => {
+export const handleCallback = async (req: Request, res: Response): Promise<any> => {
   const { code, state } = req.query;
 
   if (typeof code !== "string" || typeof state !== "string") {
-    res.status(400).send("Invalid request: Missing code or state");
-    return;
+    return res.status(400).send("Invalid request: Missing code or state");
   }
 
   const oauthState = req.session.oauthState;
   if (!oauthState || oauthState.state !== state) {
-    res.status(400).send("Invalid state: Possible CSRF attack");
-    return;
+    return res.status(400).send("Invalid state: Possible CSRF attack");
+  }
+
+  // Check state expiry (valid for 5 minutes)
+  if (Date.now() - oauthState.createdAt > 5 * 60 * 1000) {
+    return res.status(400).send("OAuth state expired");
   }
 
   delete req.session.oauthState;
@@ -193,7 +194,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
     const userProfile = await getUserProfile(access_token);
 
-    // Store or update user in database
+    // Update or create user
     const user = await User.findOneAndUpdate(
       { userId: userProfile.id },
       {
@@ -204,9 +205,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
       { upsert: true, new: true }
     );
 
-    if (!user) {
-      throw new Error("Failed to create/update user");
-    }
+    if (!user) throw new Error("Failed to create/update user");
 
     // Store tokens and user info in session
     req.session.tokens = {
@@ -216,34 +215,34 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
     
     req.session.user = {
       userId: user.userId,
-      username: user.username
+      username: user.username,
     };
 
-    if (NODE_ENV === "production" && redisClient) {
-      await redisClient.expire(`x-bookmark:${req.sessionID}`, 12 * 60 * 60);
+    if (redisClient) {
+      await redisClient.expire(`x-bookmark:${req.sessionID}`, 12 * 60 * 60); // 12 hours
     }
 
-    await new Promise<void>((resolve, reject) => {
-      req.session.save((err) => (err ? reject(err) : resolve()));
-    });
+    await new Promise<void>((resolve, reject) => req.session.save((err) => (err ? reject(err) : resolve())));
 
     res.redirect("/dashboard");
   } catch (error) {
     const axiosError = error as AxiosError;
     console.error("OAuth callback error:", axiosError.response?.data || axiosError.message);
-    if (axiosError.response?.status === 403) {
-      res.status(403).send("Forbidden: Check callback URL or Twitter app settings");
-    } else if (axiosError.response?.status === 400) {
-      res.status(400).send("Bad request: Invalid authorization code");
-    } else {
-      res.status(500).send("Server error during authentication");
-    }
+    res.status(axiosError.response?.status || 500).send("Authentication failed");
   }
 };
 
 // Cleanup on process exit
 process.on("SIGTERM", async () => {
-  if (redisClient) {
+  if (redisClient?.isOpen) {
+    await redisClient.quit();
+    console.log("Redis connection closed");
+  }
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  if (redisClient?.isOpen) {
     await redisClient.quit();
     console.log("Redis connection closed");
   }
