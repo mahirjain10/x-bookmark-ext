@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import session from "express-session";
 import { createClient } from "redis";
 import { RedisClientType } from "@redis/client";
-const RedisStore = require("connect-redis")(session);
+import { RedisStore } from "connect-redis";
 import {
   generateCodeChallenge,
   generateCodeVerifier,
