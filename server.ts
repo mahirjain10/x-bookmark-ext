@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { startLoginFlow, handleCallback, sessionMiddleware } from "./controllers/authController";
 import { connectDB } from "./db";
 import bookmarkRoutes from "./routes/bookmarkRoutes";
+import folderRoutes from "./router/folderRoutes";
 
 dotenv.config();
 
@@ -71,6 +72,8 @@ app.get("/dashboard", isAuthenticated, (req: Request, res: Response) => {
 
 // Protected API routes
 app.use('/api/bookmarks', bookmarkRoutes);
+app.use('/api/folders', folderRoutes);
+
 
 app.listen(port, () => {
   console.log(`🚀 Server running on http://localhost:${port}`);

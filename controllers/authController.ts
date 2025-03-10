@@ -3,6 +3,9 @@ import { Request, Response } from "express";
 import axios from "axios";
 import dotenv from "dotenv";
 import session from "express-session";
+import { createClient } from "redis";
+import { RedisClientType } from "@redis/client";
+const RedisStore = require("connect-redis")(session);
 import {
   generateCodeChallenge,
   generateCodeVerifier,
@@ -32,7 +35,7 @@ declare module "express-session" {
 // Load environment variables only once at the top
 dotenv.config();
 
-const { CLIENT_ID, CLIENT_SECRET, CALLBACK_URL, NODE_ENV, SESSION_SECRET } = process.env;
+const { CLIENT_ID, CLIENT_SECRET, CALLBACK_URL, NODE_ENV, SESSION_SECRET, REDIS_URL } = process.env;
 
 // Check required environment variables
 if (!CLIENT_ID || !CLIENT_SECRET || !CALLBACK_URL) {
@@ -41,13 +44,27 @@ if (!CLIENT_ID || !CLIENT_SECRET || !CALLBACK_URL) {
   );
 }
 
+// Configure Redis client and session store
+const redisClient: RedisClientType | null = NODE_ENV === "production" ? createClient({
+  url: REDIS_URL,
+  legacyMode: true
+}) : null;
+
+if (redisClient) {
+  redisClient.connect().catch(console.error);
+}
+
 // Configure session middleware
 export const sessionMiddleware = session({
+  store: NODE_ENV === "production" ? new RedisStore({ 
+    client: redisClient as any,
+    prefix: "x-bookmark:" 
+  }) : undefined,
   secret: SESSION_SECRET || "your-secret-key",
-  resave: true, // Changed to true to ensure session is saved
-  saveUninitialized: true, // Changed to true to allow saving new sessions
+  resave: false,
+  saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    secure: NODE_ENV === "production",
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
