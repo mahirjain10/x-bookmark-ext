@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "ts-node src/server.ts",
+    "start": "node --max-old-space-size=4096 dist/server.js",
+    "dev": "ts-node --max-old-space-size=4096 src/server.ts",
     "build": "tsc",
     "test": "jest --detectOpenHandles",
     "build:css": "npx tailwindcss -i ./src/styles.css -o ./public/tailwind.css --watch"
