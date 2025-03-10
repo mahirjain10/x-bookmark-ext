@@ -1,5 +1,5 @@
 // server.ts
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { startLoginFlow, handleCallback, sessionMiddleware } from "./controllers/authController";
@@ -21,8 +21,8 @@ app.use(sessionMiddleware);
 connectDB();
 
 // Authentication middleware
-const isAuthenticated = (req: Request, res: Response, next: Function) => {
-  if (req.session.tokens && req.session.user) {
+const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+  if (req.session.tokens && req.session.user?.userId) {
     next();
   } else {
     res.redirect('/auth/x');
@@ -31,11 +31,13 @@ const isAuthenticated = (req: Request, res: Response, next: Function) => {
 
 // Root endpoint
 app.get("/", (req: Request, res: Response) => {
-  const isLoggedIn = req.session.user && req.session.tokens;
+  const { user, tokens } = req.session;
+  const isLoggedIn = user?.userId && tokens;
+  
   res.send(`
     <h1>X-Bookmark Server</h1>
-    ${isLoggedIn 
-      ? `<p>Welcome @${req.session.user?.username}! <a href='/dashboard'>Go to Dashboard</a></p>`
+    ${isLoggedIn && user 
+      ? `<p>Welcome @${user.username}! <a href='/dashboard'>Go to Dashboard</a></p>`
       : `<p><a href='/auth/x'>Login with X</a></p>`
     }
   `);
@@ -49,14 +51,19 @@ app.get("/auth/x/callback", handleCallback);
 app.get("/dashboard", isAuthenticated, (req: Request, res: Response) => {
   const { user, tokens } = req.session;
   
+  if (!user || !tokens) {
+    res.redirect('/auth/x');
+    return;
+  }
+  
   res.send(`
     <h1>Dashboard</h1>
     <h2>User Profile</h2>
-    <p>Username: @${user?.username}</p>
-    <p>User ID: ${user?.userId}</p>
+    <p>Username: @${user.username}</p>
+    <p>User ID: ${user.userId}</p>
     <hr>
     <h2>Bookmarks</h2>
-    <p><a href="/api/bookmarks/user/${user?.userId}">View My Bookmarks</a></p>
+    <p><a href="/api/bookmarks/user/${user.userId}">View My Bookmarks</a></p>
     <form action="/api/bookmarks/create" method="POST">
       <h3>Add New Bookmark</h3>
       <input type="text" name="title" placeholder="Title" required>
@@ -65,15 +72,14 @@ app.get("/dashboard", isAuthenticated, (req: Request, res: Response) => {
     </form>
     <hr>
     <h2>Session Info</h2>
-    <p>Access Token: ${tokens?.access_token}</p>
-    <p>Expires at: ${new Date(tokens?.expires_at || 0).toLocaleString()}</p>
+    <p>Access Token: ${tokens.access_token}</p>
+    <p>Expires at: ${new Date(tokens.expires_at).toLocaleString()}</p>
   `);
 });
 
 // Protected API routes
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/folders', folderRoutes);
-
 
 app.listen(port, () => {
   console.log(`🚀 Server running on http://localhost:${port}`);
