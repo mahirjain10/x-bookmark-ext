@@ -224,6 +224,8 @@ export const getUserFolders = async (
     return sendResponse(res, 500, "Internal Server Error", null, error.message);
   }
 };
+
+
 export const copyFolder = async (req: Request, res: Response): Promise<any> => {
   try {
     const { newName } = req.body; // User-specified name (optional)

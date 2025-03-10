@@ -1,83 +1,93 @@
-import Bookmark, { IBookmark } from "../models/BookmarkSchema"; // Adjust path as needed
-import Folder, { IFolder } from "../models/FolderSchema"; // Adjust path as needed
 import { Request, Response } from "express";
-import sendResponse from "../utils/sendResponse"; // Adjust path as needed
+import Bookmark, { IBookmark } from "../models/BookmarkSchema";
+import Folder, { IFolder } from "../models/FolderSchema";
+import sendResponse from "../utils/sendResponse";
+import mongoose, { MongooseError } from "mongoose";
+
+// Extended Request type to include user from session
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    username: string;
+  };
+}
 
 // Get all bookmarks by userId
 export const getBookmarksByUserId = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
     const { userId } = req.params;
-    const bookmarks = await Bookmark.find({ userId }).populate({
-      path: "folder",
-      model: Folder,
-      select: "name userId isParentRoot parentFolder",
-    });
-    return sendResponse(
-      res,
-      200,
-      "Bookmarks retrieved successfully",
-      bookmarks
-    );
-  } catch (error) {
-    return sendResponse(res, 500, "Error fetching bookmarks", null, error);
+    
+    // Ensure user can only access their own bookmarks
+    if (userId !== req.user?.userId) {
+      sendResponse(res, 403, "Access denied: You can only view your own bookmarks");
+      return;
+    }
+
+    const bookmarks = await Bookmark.find({ userId })
+      .populate({
+        path: "folder",
+        model: Folder,
+        select: "name userId isParentRoot parentFolder",
+      })
+      .sort({ createdAt: -1 });
+
+    sendResponse(res, 200, "Bookmarks retrieved successfully", bookmarks);
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    sendResponse(res, 500, "Error fetching bookmarks", null, err);
   }
 };
 
 // Get all bookmarks by folder
 export const getBookmarksByFolder = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
     const { folderId } = req.params;
     const folder = await Folder.findById(folderId);
 
     if (!folder) {
-      return sendResponse(res, 404, "Folder not found");
+      sendResponse(res, 404, "Folder not found");
+      return;
     }
 
-    const bookmarks = await Bookmark.find({ folder: folderId }).populate({
-      path: "folder",
-      model: Folder,
-      select: "name userId isParentRoot parentFolder",
-    });
-    return sendResponse(
-      res,
-      200,
-      "Folder bookmarks retrieved successfully",
-      bookmarks
-    );
-  } catch (error) {
-    return sendResponse(
-      res,
-      500,
-      "Error fetching folder bookmarks",
-      null,
-      error
-    );
+    // Ensure user can only access their own folders
+    if (folder.userId !== req.user?.userId) {
+      sendResponse(res, 403, "Access denied: You can only view your own folders");
+      return;
+    }
+
+    const bookmarks = await Bookmark.find({ folder: folderId })
+      .populate({
+        path: "folder",
+        model: Folder,
+        select: "name userId isParentRoot parentFolder",
+      })
+      .sort({ createdAt: -1 });
+
+    sendResponse(res, 200, "Folder bookmarks retrieved successfully", bookmarks);
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    sendResponse(res, 500, "Error fetching folder bookmarks", null, err);
   }
 };
 
 // Create a new bookmark
 export const createBookmark = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
-    const { userId, title, url, folder } = req.body;
+    const { title, url, folder } = req.body;
+    const userId = req.user?.userId;
 
-    // Validate folder if provided
-    if (folder) {
-      const folderDoc = await Folder.findById(folder);
-      if (!folderDoc) {
-        return sendResponse(res, 404, "Folder not found");
-      }
-      if (folderDoc.userId !== userId) {
-        return sendResponse(res, 403, "Folder belongs to different user");
-      }
+    if (!userId) {
+      sendResponse(res, 401, "User not authenticated");
+      return;
     }
 
     const bookmark = new Bookmark({
@@ -88,179 +98,230 @@ export const createBookmark = async (
     });
 
     const savedBookmark = await bookmark.save();
-    return sendResponse(
-      res,
-      201,
-      "Bookmark created successfully",
-      savedBookmark
-    );
-  } catch (error) {
-    return sendResponse(res, 500, "Error creating bookmark", null, error);
+    await savedBookmark.populate({
+      path: "folder",
+      select: "name userId isParentRoot parentFolder"
+    });
+
+    sendResponse(res, 201, "Bookmark created successfully", savedBookmark);
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    if (err.name === 'ValidationError') {
+      sendResponse(res, 400, err.message, null, err);
+      return;
+    }
+    sendResponse(res, 500, "Error creating bookmark", null, err);
   }
 };
 
 // Move bookmark to another folder
 export const moveBookmark = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
     const { bookmarkId } = req.params;
     const { newFolderId } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      sendResponse(res, 401, "User not authenticated");
+      return;
+    }
 
     const bookmark = await Bookmark.findById(bookmarkId);
     if (!bookmark) {
-      return sendResponse(res, 404, "Bookmark not found");
+      sendResponse(res, 404, "Bookmark not found");
+      return;
     }
 
-    // Validate new folder if provided
-    if (newFolderId) {
-      const newFolder = await Folder.findById(newFolderId);
-      if (!newFolder) {
-        return sendResponse(res, 404, "Target folder not found");
-      }
-      if (newFolder.userId !== bookmark.userId) {
-        return sendResponse(
-          res,
-          403,
-          "Target folder belongs to different user"
-        );
-      }
-      if (bookmark.folder?.toString() === newFolderId) {
-        return sendResponse(res, 400, "Cannot move to same folder");
-      }
+    // Ensure user owns the bookmark
+    if (bookmark.userId !== userId) {
+      sendResponse(res, 403, "Access denied: You can only modify your own bookmarks");
+      return;
     }
 
     bookmark.folder = newFolderId || null;
     const updatedBookmark = await bookmark.save();
-    return sendResponse(
-      res,
-      200,
-      "Bookmark moved successfully",
-      updatedBookmark
-    );
-  } catch (error) {
-    return sendResponse(res, 500, "Error moving bookmark", null, error);
+    await updatedBookmark.populate({
+      path: "folder",
+      select: "name userId isParentRoot parentFolder"
+    });
+
+    sendResponse(res, 200, "Bookmark moved successfully", updatedBookmark);
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    if (err.name === 'ValidationError') {
+      sendResponse(res, 400, err.message, null, err);
+      return;
+    }
+    sendResponse(res, 500, "Error moving bookmark", null, err);
   }
 };
 
 // Copy bookmark to another folder
 export const copyBookmark = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
     const { bookmarkId } = req.params;
     const { targetFolderId } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      sendResponse(res, 401, "User not authenticated");
+      return;
+    }
 
     const originalBookmark = await Bookmark.findById(bookmarkId);
     if (!originalBookmark) {
-      return sendResponse(res, 404, "Bookmark not found");
+      sendResponse(res, 404, "Bookmark not found");
+      return;
     }
 
-    // Validate target folder if provided
-    if (targetFolderId) {
-      const targetFolder = await Folder.findById(targetFolderId);
-      if (!targetFolder) {
-        return sendResponse(res, 404, "Target folder not found");
-      }
-      if (targetFolder.userId !== originalBookmark.userId) {
-        return sendResponse(
-          res,
-          403,
-          "Target folder belongs to different user"
-        );
-      }
+    // Ensure user owns the bookmark
+    if (originalBookmark.userId !== userId) {
+      sendResponse(res, 403, "Access denied: You can only copy your own bookmarks");
+      return;
     }
 
     const newBookmark = new Bookmark({
-      userId: originalBookmark.userId,
+      userId,
       title: originalBookmark.title,
       url: originalBookmark.url,
       folder: targetFolderId || null,
     });
 
     const savedBookmark = await newBookmark.save();
-    return sendResponse(
-      res,
-      201,
-      "Bookmark copied successfully",
-      savedBookmark
-    );
-  } catch (error) {
-    return sendResponse(res, 500, "Error copying bookmark", null, error);
+    await savedBookmark.populate({
+      path: "folder",
+      select: "name userId isParentRoot parentFolder"
+    });
+
+    sendResponse(res, 201, "Bookmark copied successfully", savedBookmark);
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    if (err.name === 'ValidationError') {
+      sendResponse(res, 400, err.message, null, err);
+      return;
+    }
+    sendResponse(res, 500, "Error copying bookmark", null, err);
   }
 };
 
 // Delete a bookmark
 export const deleteBookmark = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
     const { bookmarkId } = req.params;
-    const bookmark = await Bookmark.findByIdAndDelete(bookmarkId);
+    const userId = req.user?.userId;
 
-    if (!bookmark) {
-      return sendResponse(res, 404, "Bookmark not found");
+    if (!userId) {
+      sendResponse(res, 401, "User not authenticated");
+      return;
     }
 
-    return sendResponse(res, 200, "Bookmark deleted successfully");
-  } catch (error) {
-    return sendResponse(res, 500, "Error deleting bookmark", null, error);
+    const bookmark = await Bookmark.findById(bookmarkId);
+    if (!bookmark) {
+      sendResponse(res, 404, "Bookmark not found");
+      return;
+    }
+
+    // Ensure user owns the bookmark
+    if (bookmark.userId !== userId) {
+      sendResponse(res, 403, "Access denied: You can only delete your own bookmarks");
+      return;
+    }
+
+    await bookmark.deleteOne();
+    sendResponse(res, 200, "Bookmark deleted successfully");
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    sendResponse(res, 500, "Error deleting bookmark", null, err);
   }
 };
 
 // Rename a bookmark
 export const renameBookmark = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
     const { bookmarkId } = req.params;
-    const { newTitle } = req.body;
+    const { title } = req.body;
+    const userId = req.user?.userId;
 
-    if (!newTitle || typeof newTitle !== "string" || newTitle.trim() === "") {
-      return sendResponse(res, 400, "Valid new title is required");
+    if (!userId) {
+      sendResponse(res, 401, "User not authenticated");
+      return;
     }
 
     const bookmark = await Bookmark.findById(bookmarkId);
     if (!bookmark) {
-      return sendResponse(res, 404, "Bookmark not found");
+      sendResponse(res, 404, "Bookmark not found");
+      return;
     }
 
-    bookmark.title = newTitle.trim();
+    // Ensure user owns the bookmark
+    if (bookmark.userId !== userId) {
+      sendResponse(res, 403, "Access denied: You can only rename your own bookmarks");
+      return;
+    }
+
+    bookmark.title = title;
     const updatedBookmark = await bookmark.save();
-    return sendResponse(
-      res,
-      200,
-      "Bookmark renamed successfully",
-      updatedBookmark
-    );
-  } catch (error) {
-    return sendResponse(res, 500, "Error renaming bookmark", null, error);
+    await updatedBookmark.populate({
+      path: "folder",
+      select: "name userId isParentRoot parentFolder"
+    });
+
+    sendResponse(res, 200, "Bookmark renamed successfully", updatedBookmark);
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    if (err.name === 'ValidationError') {
+      sendResponse(res, 400, err.message, null, err);
+      return;
+    }
+    sendResponse(res, 500, "Error renaming bookmark", null, err);
   }
 };
 
 // Get bookmark by ID
 export const getBookmarkById = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
-): Promise<any> => {
+): Promise<void> => {
   try {
     const { bookmarkId } = req.params;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      sendResponse(res, 401, "User not authenticated");
+      return;
+    }
+
     const bookmark = await Bookmark.findById(bookmarkId).populate({
       path: "folder",
-      model: Folder,
-      select: "name userId isParentRoot parentFolder",
+      select: "name userId isParentRoot parentFolder"
     });
 
     if (!bookmark) {
-      return sendResponse(res, 404, "Bookmark not found");
+      sendResponse(res, 404, "Bookmark not found");
+      return;
     }
 
-    return sendResponse(res, 200, "Bookmark retrieved successfully", bookmark);
-  } catch (error) {
-    return sendResponse(res, 500, "Error fetching bookmark", null, error);
+    // Ensure user owns the bookmark
+    if (bookmark.userId !== userId) {
+      sendResponse(res, 403, "Access denied: You can only view your own bookmarks");
+      return;
+    }
+
+    sendResponse(res, 200, "Bookmark retrieved successfully", bookmark);
+  } catch (error: unknown) {
+    const err = error as MongooseError;
+    sendResponse(res, 500, "Error fetching bookmark", null, err);
   }
 };

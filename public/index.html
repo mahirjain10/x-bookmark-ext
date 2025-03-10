@@ -163,6 +163,284 @@
         <div id="content-list" class="flex-1 overflow-y-auto space-y-1"></div>
     </div>
     <script>
+ 
+        // Convert API response to folder structure
+        function convertApiResponseToFolderStructure(apiResponse) {
+            const foldersMap = new Map();
+            const rootFolder = { _id: "root", userId: "user1234", name: "Root", parentFolder: null, bookmarks: [dummyBookmarks[0]], subFolders: [] };
+
+            apiResponse.data.forEach(folder => {
+                foldersMap.set(folder._id, {
+                    _id: folder._id,
+                    userId: folder.userId,
+                    name: folder.name,
+                    parentFolder: folder.parentFolder ? folder.parentFolder._id : null,
+                    bookmarks: [],
+                    subFolders: []
+                });
+            });
+
+            // Assign dummy bookmarks
+            if (foldersMap.has("67cb1f23a262319ffd169221")) foldersMap.get("67cb1f23a262319ffd169221").bookmarks = [dummyBookmarks[1]];
+            if (foldersMap.has("67cb1f62a262319ffd169231")) foldersMap.get("67cb1f62a262319ffd169231").bookmarks = [dummyBookmarks[2]];
+            if (foldersMap.has("67cb1f76a262319ffd169235")) foldersMap.get("67cb1f76a262319ffd169235").bookmarks = [dummyBookmarks[3]];
+
+            apiResponse.data.forEach(folder => {
+                const currentFolder = foldersMap.get(folder._id);
+                if (folder.isParentRoot && !folder.parentFolder) rootFolder.subFolders.push(currentFolder);
+                else if (folder.parentFolder) {
+                    const parent = foldersMap.get(folder.parentFolder._id);
+                    if (parent) parent.subFolders.push(currentFolder);
+                }
+            });
+
+            return { folders: [rootFolder] };
+        }
+
+        function showLoader() {
+            loader.style.display = 'block';
+            document.getElementById('content-list').style.opacity = '0.5';
+        }
+
+        function hideLoader() {
+            loader.style.display = 'none';
+            document.getElementById('content-list').style.opacity = '1';
+        }
+
+        function showMessage(message, isSuccess = true) {
+            // Remove any existing toasts first
+            while (toastContainer.firstChild) {
+                toastContainer.removeChild(toastContainer.firstChild);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = `w-[300px] p-3 rounded shadow-lg text-center ${isSuccess
+                ? 'bg-green-100 text-green-700 border border-green-400'
+                : 'bg-red-100 text-red-700 border border-red-400'
+                }`;
+
+            toast.innerHTML = `
+        <div class="flex items-center justify-center">
+            <span class="mr-2">${isSuccess ? '✅' : '❌'}</span>
+            <span class="text-sm">${message}</span>
+        </div>
+    `;
+
+            toastContainer.appendChild(toast);
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+    <script>
+        // API Integration
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        async function fetchFolders() {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/folders/user/${getUserId()}`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to fetch folders');
+                const data = await response.json();
+                folderData = convertApiResponseToFolderStructure(data);
+                currentFolder = folderData;
+                renderContent();
+                renderBreadcrumbs();
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function createFolder(name) {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/folders/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        name,
+                        parentFolder: currentFolder._id === 'root' ? null : currentFolder._id
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to create folder');
+                await fetchFolders();
+                showMessage('Folder created successfully');
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function createBookmark(title, url) {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/bookmarks/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        title,
+                        url,
+                        folderId: currentFolder._id === 'root' ? null : currentFolder._id
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to create bookmark');
+                await fetchFolders();
+                showMessage('Bookmark created successfully');
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function moveFolder(folderId, newParentId) {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/folders/move/${folderId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        newParentId: newParentId === 'root' ? null : newParentId
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to move folder');
+                await fetchFolders();
+                showMessage('Folder moved successfully');
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function moveBookmark(bookmarkId, newFolderId) {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/bookmarks/move/${bookmarkId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        newFolderId: newFolderId === 'root' ? null : newFolderId
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to move bookmark');
+                await fetchFolders();
+                showMessage('Bookmark moved successfully');
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function deleteFolder(folderId) {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/folders/${folderId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to delete folder');
+                await fetchFolders();
+                showMessage('Folder deleted successfully');
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function deleteBookmark(bookmarkId) {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/bookmarks/${bookmarkId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to delete bookmark');
+                await fetchFolders();
+                showMessage('Bookmark deleted successfully');
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function searchBookmarksAndFolders(query, filter = 'all') {
+            try {
+                showLoader();
+                const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}&filter=${filter}`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to search');
+                const results = await response.json();
+                // Update UI with search results
+                renderSearchResults(results);
+            } catch (error) {
+                showMessage(error.message, false);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function getUserId() {
+            // This should be replaced with actual user ID from your auth system
+            return 'user1234';
+        }
+
+        // Update the existing event listeners to use the new API functions
+        document.getElementById('submit-folder').onclick = async () => {
+            const folderName = document.getElementById('folder-name').value.trim();
+            if (!folderName) {
+                showMessage('Please enter a folder name', false);
+                return;
+            }
+            await createFolder(folderName);
+            document.getElementById('folder-name').value = '';
+            hideAllInputs();
+        };
+
+        document.getElementById('submit-bookmark').onclick = async () => {
+            const title = document.getElementById('bookmark-title').value.trim();
+            const url = document.getElementById('bookmark-url').value.trim();
+            if (!title || !url) {
+                showMessage('Please enter both title and URL', false);
+                return;
+            }
+            await createBookmark(title, url);
+            document.getElementById('bookmark-title').value = '';
+            document.getElementById('bookmark-url').value = '';
+            hideAllInputs();
+        };
+
+        document.getElementById('search-submit').onclick = async () => {
+            const query = document.getElementById('search-bar').value.trim();
+            const filter = document.getElementById('search-filter').value;
+            if (!query) {
+                showMessage('Please enter a search query', false);
+                return;
+            }
+            await searchBookmarksAndFolders(query, filter);
+        };
+
+        // Initialize the app
+        window.onload = () => {
+            fetchFolders();
+        };
+    </script>
+    <script>
         // Dummy bookmarks
         const dummyBookmarks = [
             { _id: "bm1", title: "Google", url: "https://google.com", createdAt: "2025-03-01T10:00:00Z" },
@@ -246,34 +524,6 @@
         }
     </script>
     <script>
-        async function fetchFolders() {
-            showLoader();
-            try {
-                const response = await fetch('https://x-boomark-ext.onrender.com/folders/user1234');
-                if (!response.ok) throw new Error('Network response was not ok');
-                const apiResponse = await response.json();
-                folderData = convertApiResponseToFolderStructure(apiResponse);
-                currentFolder = folderData.folders[0];
-                folderStack = [currentFolder];
-                renderBreadcrumbs();
-                renderContent();
-
-                // Use the message from the API response if available
-                const message = apiResponse.message || 'Folders loaded successfully';
-                const isSuccess = apiResponse.success !== undefined ? apiResponse.success : true;
-                showMessage(message, isSuccess);
-            } catch (error) {
-                console.error('Error fetching folders:', error);
-                folderData = { folders: [{ _id: "root", userId: "user1234", name: "Root", parentFolder: null, bookmarks: dummyBookmarks, subFolders: [] }] };
-                currentFolder = folderData.folders[0];
-                folderStack = [currentFolder];
-                renderBreadcrumbs();
-                renderContent();
-                showMessage('Failed to load folders, using dummy data', false);
-            } finally {
-                hideLoader();
-            }
-        }
         // Function to set up menu actions for both folders and bookmarks
         // Function to set up menu actions for both folders and bookma
         // rks

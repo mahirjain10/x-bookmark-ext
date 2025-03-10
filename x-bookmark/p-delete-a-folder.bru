@@ -1,11 +1,17 @@
 meta {
   name: p-delete-a-folder
   type: http
-  seq: 9
+  seq: 10
 }
 
-get {
-  url: 
-  body: none
+delete {
+  url: https://x-boomark-ext.onrender.com/folders/67cb404ea31dbffea6a92676
+  body: json
   auth: none
+}
+
+body:json {
+  {
+    "parentFolder":"67cb4045a31dbffea6a92673"
+  }
 }

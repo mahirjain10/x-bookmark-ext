@@ -1,60 +1,77 @@
+// server.ts
 import express, { Request, Response } from "express";
 import cors from "cors";
-import folderRoutes from "./router/folderRoutes";
-import searchRoutes from "./router/searchRoutes";
-import bookmarkRoutes from "./router/bookmarkRoutes";
-import { connectDB } from "./db";
 import dotenv from "dotenv";
+import { startLoginFlow, handleCallback, sessionMiddleware } from "./controllers/authController";
+import { connectDB } from "./db";
+import bookmarkRoutes from "./routes/bookmarkRoutes";
 
-dotenv.config(); // Load environment variables
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// Middleware setup
+app.use(cors()); 
 app.use(express.json());
+app.use(sessionMiddleware);
 
-// Define query parameter interface for /auth/x/callback
-interface AuthCallbackQuery {
-  code?: string;
-  state?: string;
-}
+// Database connection
+connectDB();
 
-// Connect to MongoDB before starting the server
-connectDB().then(() => {
-  app.use("/folders", folderRoutes);
-  app.use("/search", searchRoutes);
-  app.use("/bookmark", bookmarkRoutes);
+// Authentication middleware
+const isAuthenticated = (req: Request, res: Response, next: Function) => {
+  if (req.session.tokens && req.session.user) {
+    next();
+  } else {
+    res.redirect('/auth/x');
+  }
+};
 
-  app.get("/", (req: Request, res: Response) => {
-    res.send("Hello, X-Bookmark Server!");
-  });
-
-  const CLIENT_ID = "STZ0eHdVUUh0T2JETlAtSXFKTzU6MTpjaQ"; // Replace with your API Key from X Portal
-  const CALLBACK_URL = "https://x-boomark-ext.onrender.com/auth/x/callback";
-
-  // Start the login flow
-  app.get("/auth/x", (req: Request, res: Response) => {
-    const authUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${CALLBACK_URL}&scope=users.read&state=xyz123&code_challenge=challenge&code_challenge_method=S256`;
-    res.redirect(authUrl);
-  });
-
-  // Handle the callback
-  app.get(
-    "/auth/x/callback",
-    (req: Request<{}, any, any, AuthCallbackQuery>, res: Response) => {
-      const { code, state } = req.query;
-      if (state !== "xyz123") {
-        res.status(400).send("Invalid state");
-        return; // Explicit return to satisfy TypeScript
-      }
-      res.send(
-        `Received code: ${code} - Next step: Exchange this for an access token`
-      );
+// Root endpoint
+app.get("/", (req: Request, res: Response) => {
+  const isLoggedIn = req.session.user && req.session.tokens;
+  res.send(`
+    <h1>X-Bookmark Server</h1>
+    ${isLoggedIn 
+      ? `<p>Welcome @${req.session.user?.username}! <a href='/dashboard'>Go to Dashboard</a></p>`
+      : `<p><a href='/auth/x'>Login with X</a></p>`
     }
-  );
+  `);
+});
 
-  app.listen(port, () => {
-    console.log(`🚀 Server is running on port ${port}`);
-  });
+// Authentication routes
+app.get("/auth/x", startLoginFlow);
+app.get("/auth/x/callback", handleCallback);
+
+// Dashboard route (protected)
+app.get("/dashboard", isAuthenticated, (req: Request, res: Response) => {
+  const { user, tokens } = req.session;
+  
+  res.send(`
+    <h1>Dashboard</h1>
+    <h2>User Profile</h2>
+    <p>Username: @${user?.username}</p>
+    <p>User ID: ${user?.userId}</p>
+    <hr>
+    <h2>Bookmarks</h2>
+    <p><a href="/api/bookmarks/user/${user?.userId}">View My Bookmarks</a></p>
+    <form action="/api/bookmarks/create" method="POST">
+      <h3>Add New Bookmark</h3>
+      <input type="text" name="title" placeholder="Title" required>
+      <input type="url" name="url" placeholder="URL" required>
+      <button type="submit">Add Bookmark</button>
+    </form>
+    <hr>
+    <h2>Session Info</h2>
+    <p>Access Token: ${tokens?.access_token}</p>
+    <p>Expires at: ${new Date(tokens?.expires_at || 0).toLocaleString()}</p>
+  `);
+});
+
+// Protected API routes
+app.use('/api/bookmarks', bookmarkRoutes);
+
+app.listen(port, () => {
+  console.log(`🚀 Server running on http://localhost:${port}`);
 });
