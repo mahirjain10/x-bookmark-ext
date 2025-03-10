@@ -47,18 +47,25 @@ if (!CLIENT_ID || !CLIENT_SECRET || !CALLBACK_URL) {
 // Configure Redis client and session store
 const redisClient: RedisClientType | null = NODE_ENV === "production" ? createClient({
   url: REDIS_URL,
-  legacyMode: true
+  legacyMode: false,
+  socket: {
+    reconnectStrategy: (retries) => Math.min(retries * 50, 1000)
+  }
 }) : null;
 
 if (redisClient) {
   redisClient.connect().catch(console.error);
+  // Set memory limits and cleanup policies
+  redisClient.configSet('maxmemory', '100mb').catch(console.error);
+  redisClient.configSet('maxmemory-policy', 'allkeys-lru').catch(console.error);
 }
 
 // Configure session middleware
 export const sessionMiddleware = session({
   store: NODE_ENV === "production" ? new RedisStore({ 
     client: redisClient as any,
-    prefix: "x-bookmark:" 
+    prefix: "x-bookmark:",
+    ttl: 12 * 60 * 60  // 12 hours in seconds
   }) : undefined,
   secret: SESSION_SECRET || "your-secret-key",
   resave: false,
@@ -66,7 +73,7 @@ export const sessionMiddleware = session({
   cookie: {
     secure: NODE_ENV === "production",
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 12 * 60 * 60 * 1000  // 12 hours
   }
 });
 
